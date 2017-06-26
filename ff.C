@@ -14,9 +14,14 @@ const float kSolR2Max4 = 500.*500.;
 
 const float kSolZMax = 260.;
 
+enum {kSolR0,kSolR1,kSolR2,kSolR3,kSolR4};
+enum {kX,kY,kZ};
+
 int GetQuadrant(float x,float y) {
   return y>0 ? (x>0 ? 0:1) : (x>0 ? 3:2);
 }
+
+float pl(const float* cf, float x,float y, float z);
 
 struct SolParam {
   float mParBxyz[3][20];
@@ -27,43 +32,55 @@ typedef SolParam SolParam;
 SolParam solPar[kNSolRRanges][kNSolZRanges][kNQuadrants];
 
 
-void ff(double xyz[3])
+
+Bool_t bfast(double xyz[3], double bxyz[3])
 {
   float x(xyz[0]),y(xyz[1]),z(xyz[2]);
-  int izSeg = -1;
-  if (z<kSolZMax) {
-    if (izSeg>-kSolZMax) izSeg = z<0.f ? 0:1; // solenoid params
-    else { // need to check dipole params
 
+  // Z segment
+  int zSeg = -1;
+  if (z<kSolZMax) {
+    if (zSeg>-kSolZMax) zSeg = z<0.f ? 0:1; // solenoid params
+    else { // need to check dipole params
+      return kFALSE;
     }
   }
-  
+  // R segment
   float xx = x*x, yy = y*y, rr = xx+yy;
-  
+  int rSeg = -1;
   if (rr < kSolR2Max0) {
-
+    rSeg = kSolR0;
   }
   else if (rr < kSolR2Max1) {
-
+    rSeg = kSolR1;
   }
   else if (rr < kSolR2Max2) {
-
+    rSeg = kSolR2;
   }
   else if (rr < kSolR2Max3) {
-
+    rSeg = kSolR3;
   }
   else if (rr < kSolR2Max4) {
-
+    rSeg = kSolR4;
   }
   else { // redefine to max radius
+    rSeg = kSolR4;
     float scl2Bond = sqrtf(kSolR2Max4/rr);
     x *= scl2Bond;
     y *= scl2Bond;
   }
-  
+
+  // quadrant
+  int quadrant = GetQuadrant(x,y);
+  const SolParam *par = &solPar[rSeg][zSeg][quadrant];
+  bxyz[kX] = pl(par->mParBxyz[kX],x,y,z);
+  bxyz[kY] = pl(par->mParBxyz[kY],x,y,z);
+  bxyz[kZ] = pl(par->mParBxyz[kZ],x,y,z);
+  //
+  return kTRUE;
 }
 
-double pl(const double* cf, double x,double y, double z)
+inline float pl(const float* cf, float x,float y, float z)
 {
 
   /** calculate polynomial
@@ -71,7 +88,7 @@ double pl(const double* cf, double x,double y, double z)
    *   cf[10]*xxx + cf[11]*xxy + cf[12]*xxz + cf[13]*xyy + cf[14]*xyz + cf[15]*xzz + cf[16]*yyy + cf[17]*yyz + cf[18]*yzz + cf[19]*zzz
   **/
 
-    double val = cf[0] +
+    float val = cf[0] +
     x*(cf[1] + x*(cf[4] + x*cf[10] + y*cf[11] + z*cf[12]) + y*(cf[5]+z*cf[14]) ) +
     y*(cf[2] + y*(cf[7] + x*cf[13] + y*cf[16] + z*cf[17]) + z*(cf[8]) ) +
     z*(cf[3] + z*(cf[9] + x*cf[15] + y*cf[18] + z*cf[19]) + x*(cf[6]) );
